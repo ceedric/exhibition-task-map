@@ -115,6 +115,10 @@ textarea{width:100%; min-height:70px; resize:vertical; font-family:'Inter';}
 .cal-line{font-size:0.65rem; line-height:1.5; padding:0 6px; cursor:pointer; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;}
 .cal-line.cal-more{font-weight:700; opacity:.85;}
 .cal-line:hover{text-decoration:underline;}
+.show-dates{display:flex; align-items:center; gap:10px; margin-top:8px; flex-wrap:wrap;}
+.show-dates .f{flex-direction:row; align-items:center; gap:5px; font-size:0.72rem;}
+.show-dates .f input{padding:3px 7px; font-size:0.78rem;}
+.show-dates .hint{font-size:0.72rem;}
 @media (max-width:640px){header,main{padding-left:16px; padding-right:16px;} .grid2{grid-template-columns:1fr;}}
 </style>
 </head>
@@ -124,6 +128,12 @@ textarea{width:100%; min-height:70px; resize:vertical; font-family:'Inter';}
   <div>
     <h1>Exhibition Task <span>Map</span></h1>
     <div class="sub">A template for planning a collaborative art exhibition — rename the categories, delete the examples, make it yours.</div>
+    <div class="show-dates">
+      <label class="f">Install<input type="date" id="sd_install"></label>
+      <label class="f">Opens<input type="date" id="sd_open"></label>
+      <label class="f">Closes<input type="date" id="sd_close"></label>
+      <span class="hint">set your show's dates once — the calendar view uses them as its default window</span>
+    </div>
   </div>
   <div class="tabs">
     <button class="tab-btn active" data-tab="tree">Tree</button>
@@ -302,7 +312,8 @@ let state = {
   roster: ['Me'],
   tasks: seedTasks(),
   collapsed: {},
-  calendarHidden: []
+  calendarHidden: [],
+  showDates: {install:'', open:'', close:''}
 };
 
 let activeTab = 'tree';
@@ -469,13 +480,15 @@ function renderCalendar(){
   const el = document.getElementById('calContent');
   const relevant = state.tasks.filter(t=>t.deadline);
   const today = new Date(); today.setHours(0,0,0,0);
+  const sd = state.showDates || {};
+  const showMs = [sd.install, sd.open, sd.close].filter(Boolean).map(d=> new Date(d+'T00:00:00').getTime());
   let start = new Date(today); start.setDate(start.getDate()-3);
   let end = new Date(today); end.setDate(end.getDate()+45);
-  if(relevant.length){
+  if(relevant.length || showMs.length){
     const ms = relevant.map(t=> new Date(t.deadline+'T00:00:00').getTime());
     const msEnd = relevant.filter(t=>t.endDate).map(t=> new Date(t.endDate+'T00:00:00').getTime());
-    start = new Date(Math.min(...ms, today.getTime())); start.setDate(start.getDate()-3);
-    end = new Date(Math.max(...ms, ...msEnd, today.getTime())); end.setDate(end.getDate()+5);
+    start = new Date(Math.min(...ms, ...showMs, today.getTime())); start.setDate(start.getDate()-3);
+    end = new Date(Math.max(...ms, ...msEnd, ...showMs, today.getTime())); end.setDate(end.getDate()+5);
   }
   const days = [];
   for(let d=new Date(start); d<=end; d.setDate(d.getDate()+1)) days.push(new Date(d));
@@ -734,7 +747,8 @@ function startResetHold(){
     if(pct>=100){
       clearInterval(resetTimer); resetTimer=null; bar.style.width='0%';
       uidCounter = 1; orderCounter = 1;
-      state = { roster: ['Me'], tasks: templateSeed(), collapsed: {}, calendarHidden: [] };
+      state = { roster: ['Me'], tasks: templateSeed(), collapsed: {}, calendarHidden: [], showDates: {install:'', open:'', close:''} };
+      renderShowDates();
       renderAll();
     }
   }, 30);
@@ -753,7 +767,7 @@ document.getElementById('ioToggle').addEventListener('click', ()=>{
   document.getElementById('ioPanel').classList.toggle('open');
 });
 function buildPayloadString(){
-  const payload = { roster: state.roster, tasks: state.tasks, collapsed: state.collapsed, calendarHidden: state.calendarHidden, v:4 };
+  const payload = { roster: state.roster, tasks: state.tasks, collapsed: state.collapsed, calendarHidden: state.calendarHidden, showDates: state.showDates, v:5 };
   const json = JSON.stringify(payload);
   if(window.LZString) return 'lz:' + LZString.compressToEncodedURIComponent(json);
   return 'b64:' + btoa(unescape(encodeURIComponent(json)));
@@ -776,7 +790,9 @@ function loadPayload(payload){
   state.tasks = payload.tasks.map(t=> Object.assign({pinned:false, order:nextOrder(), endDate:'', lastEditedBy:'', lastEditedAt:''}, t));
   state.collapsed = payload.collapsed || {};
   state.calendarHidden = payload.calendarHidden || [];
+  state.showDates = Object.assign({install:'', open:'', close:''}, payload.showDates || {});
   uidCounter = 1 + Math.max(0, ...state.tasks.map(t=>parseInt((t.id||'t0').slice(1))||0));
+  renderShowDates();
 }
 
 document.getElementById('exportBtn').addEventListener('click', ()=>{
@@ -930,7 +946,7 @@ function scheduleAutoSync(){
 }
 async function syncPush(){
   const status = document.getElementById('syncStatus');
-  const payload = { roster: state.roster, tasks: state.tasks, collapsed: state.collapsed, calendarHidden: state.calendarHidden, v:4, savedBy: lastEditorName(), savedAt: new Date().toISOString() };
+  const payload = { roster: state.roster, tasks: state.tasks, collapsed: state.collapsed, calendarHidden: state.calendarHidden, showDates: state.showDates, v:5, savedBy: lastEditorName(), savedAt: new Date().toISOString() };
   try{
     const res = await fetch(API_URL, { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(payload) });
     const j = await res.json();
@@ -976,6 +992,21 @@ async function showHistory(){
 document.getElementById('syncNowBtn').addEventListener('click', syncPush);
 document.getElementById('historyBtn').addEventListener('click', showHistory);
 
+function renderShowDates(){
+  const sd = state.showDates || {install:'', open:'', close:''};
+  document.getElementById('sd_install').value = sd.install || '';
+  document.getElementById('sd_open').value = sd.open || '';
+  document.getElementById('sd_close').value = sd.close || '';
+}
+['install','open','close'].forEach(key=>{
+  document.getElementById('sd_'+key).addEventListener('change', e=>{
+    if(!state.showDates) state.showDates = {install:'', open:'', close:''};
+    state.showDates[key] = e.target.value;
+    if(activeTab==='calendar') renderCalendar();
+    scheduleAutoSync();
+  });
+});
+
 renderLegend();
 (async function init(){
   const loadedFromServer = await syncPull(true);
@@ -984,6 +1015,7 @@ renderLegend();
       loadPayload(parsePayloadString(decodeURIComponent(location.hash.slice(3))));
     }catch(e){ /* fall through to default seed */ }
   }
+  renderShowDates();
   renderAll();
 })();
 </script>
