@@ -109,6 +109,12 @@ textarea{width:100%; min-height:70px; resize:vertical; font-family:'Inter';}
 .stuck-link{margin-top:8px;}
 .stuck-link a{color:var(--accent); font-weight:600; text-decoration:none; font-size:0.78rem;}
 .stuck-link a:hover{text-decoration:underline;}
+.delegation-check{margin-top:8px;}
+.delegation-check > a{color:var(--c-people); font-weight:600; text-decoration:none; font-size:0.78rem; cursor:pointer;}
+.delegation-check > a:hover{text-decoration:underline;}
+.delegation-body{margin-top:8px; padding:10px 12px; background:var(--paper); border:1px solid var(--line); border-radius:10px;}
+.delegation-body div{font-size:0.78rem; line-height:1.45; padding:4px 0;}
+.delegation-body b{color:var(--c-people);}
 #resetBtn{position:relative; overflow:hidden; font-size:0.68rem; padding:5px 10px; color:#8a3a3a; border-color:#e2c9c9;}
 .reset-progress{position:absolute; left:0; top:0; bottom:0; width:0%; background:#e2c9c9; pointer-events:none;}
 .reset-label{position:relative; z-index:1;}
@@ -210,6 +216,15 @@ textarea{width:100%; min-height:70px; resize:vertical; font-family:'Inter';}
     <label class="pin-checkbox-row"><input type="checkbox" id="f_pinned"> Pin to top of its list</label>
     <div class="hint" id="editedHint"></div>
     <div class="stuck-link"><a href="https://construction.cedrictai.com/bubblemap.html#stuck" target="_blank" rel="noopener">Stuck on this? → open the Stuck section on Bubblemap ↗</a></div>
+    <div class="delegation-check" id="delegationCheck" style="display:none;">
+      <a onclick="toggleDelegationCheck()" id="delegationToggle">Delegating this? → quick consent &amp; boundaries check ▸</a>
+      <div class="delegation-body" id="delegationBody" style="display:none;">
+        <div><b>Consent & Boundaries</b> — has this person actually said yes to this, recently and specifically, without pressure?</div>
+        <div><b>Interdependence</b> — is this a shared task, or does it quietly assume this is a favor they owe you?</div>
+        <div><b>Collective Leadership</b> — do they have a say in how it gets divided, not just whether they do it?</div>
+        <div><b>Reciprocity</b> — what do they get back for this — credit, pay, skill, food, an actual thank-you?</div>
+      </div>
+    </div>
     <div class="hint" id="decisionHint"></div>
     <div class="modal-actions">
       <button class="btn danger" id="deleteTaskBtn">delete</button>
@@ -617,6 +632,8 @@ function openModal(id, prefill){
   document.getElementById('f_editor').value = lastEditorName();
   document.getElementById('editedHint').textContent = (t.lastEditedBy ? 'last edited by '+t.lastEditedBy+(t.lastEditedAt?' on '+t.lastEditedAt:'') : '');
   document.getElementById('deleteTaskBtn').style.display = id ? 'inline-block' : 'none';
+  document.getElementById('delegationBody').style.display = 'none';
+  document.getElementById('delegationToggle').textContent = 'Delegating this? → quick consent & boundaries check ▸';
   updateDecisionHint();
   document.getElementById('overlay').classList.add('open');
   document.getElementById('overlay').dataset.parentId = (prefill&&prefill.parentId)||(t.parentId||'');
@@ -632,6 +649,13 @@ function updateDecisionHint(){
   else if(paid==='yes') label='Hired / paid';
   else label='Delegated to '+assignee;
   document.getElementById('decisionHint').textContent = label;
+  document.getElementById('delegationCheck').style.display = (label.indexOf('Delegated to')===0) ? 'block' : 'none';
+}
+function toggleDelegationCheck(){
+  const body = document.getElementById('delegationBody');
+  const open = body.style.display !== 'none';
+  body.style.display = open ? 'none' : 'block';
+  document.getElementById('delegationToggle').textContent = 'Delegating this? → quick consent & boundaries check ' + (open ? '▸' : '▾');
 }
 ['f_assignee','f_paid','f_status'].forEach(id=>{
   document.addEventListener('input', e=>{ if(e.target.id===id) updateDecisionHint(); });
